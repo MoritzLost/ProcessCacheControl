@@ -14,8 +14,8 @@ class ProcessCacheControlConfig extends ModuleConfig
             'PageRenderExpireAll' => true,
             'ClearCacheDirectories' => [
                 'Page'
-            ], // @TODO: Sensible default, but only if folders exist
-            // HTTP ASSET CACHE???
+            ],
+            'ClearAllAssetVersions' => true,
             // CLEAR ACTIVE SESSIONS (// except current user?)?
         ];
     }
@@ -51,18 +51,26 @@ class ProcessCacheControlConfig extends ModuleConfig
         // @TODO: Link to documentation in WireCache
 
         // Show location
-        $ClearCacheDirectories = wire()->modules->get("InputfieldCheckboxes");
+        $ClearCacheDirectories = wire()->modules->get('InputfieldCheckboxes');
         $ClearCacheDirectories->name = 'ClearCacheDirectories';
         $ClearCacheDirectories->label = $this->_('Clear Cache Directories');
         $ClearCacheDirectories->description = $this->_("Select which folders in your site's cache directory you want to clear.");
-        $ClearCacheDirectories->notes = $this->_('"Page" should always be selected, as it contains the template render cache. If a folder in your cache directory does not appear in this list, it may not be writable by the server.');
+        $ClearCacheDirectories->notes = $this->_("If a 'Page' entry exists it should always be selected, as it contains the template render cache.\n If a folder in your cache directory does not appear in this list, it may not be writable by the server.");
         $ClearCacheDirectories->columnWidth = 50;
-
         $cacheDirectories = $this->getCacheDirectories();
         foreach ($cacheDirectories as $cacheDir) {
             $ClearCacheDirectories->addOption($cacheDir, $cacheDir);
         }
 
+        // clear asset versions
+        $ClearAllAssetVersions = wire()->modules->get('InputfieldCheckbox');
+        $ClearAllAssetVersions->name = 'ClearAllAssetVersions';
+        $ClearAllAssetVersions->label = $this->_('Asset versions');
+        $ClearAllAssetVersions->label2 = $this->_('Refresh all stored asset versions.');
+        $ClearAllAssetVersions->columnWidth = 50;
+        $ClearAllAssetVersions->collapsed = Inputfield::collapsedNever;
+
+        // wrap inside a fieldset for the default action
         $defaultActionFieldset = wire()->modules->get('InputfieldFieldset');
         $defaultActionFieldset->label = $this->_('Default "Clear All" action');
         $defaultActionFieldset->description = $this->_('Those options control what happens when you the default "Clear all" action is executed. Consult the documentation to find out how to add custom actions to the module.');
@@ -72,6 +80,7 @@ class ProcessCacheControlConfig extends ModuleConfig
         $defaultActionFieldset->add($WireCacheDeleteAll);
         $defaultActionFieldset->add($WireCacheDeleteNamespaces);
         $defaultActionFieldset->add($ClearCacheDirectories);
+        $defaultActionFieldset->add($ClearAllAssetVersions);
 
         $inputfields->add($defaultActionFieldset);
 

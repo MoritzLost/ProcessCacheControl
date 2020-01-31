@@ -21,7 +21,8 @@ class ProcessCacheControl extends Process implements Module
             'useNavJSON' => true,
 
             'requires' => [
-                'PHP>=7.1'
+                'ProcessWire>=3.0.130',
+                'PHP>=7.1',
             ],
 
             'page' => [
@@ -94,7 +95,38 @@ class ProcessCacheControl extends Process implements Module
             'limit' => $newLogTotal - $oldLogTotal,
             'reverse' => false,
         ]);
-        \bd($newLogEntries);
+
+        // generate module output
+        $actionForm = $this->modules->get('InputfieldForm');
+
+        // list available actions
+        $buttonWrapper = $this->modules->get('InputfieldFieldset');
+        $buttonWrapper->label = $this->_('Available Cache Control Actions');
+        $buttonWrapper->columnWidth = 50;
+        $buttonWrapper->collapsed = Inputfield::collapsedNever;
+        foreach ($this->getActionDefinitions() as $actionDefinition) {
+            $action = $this->modules->get('InputfieldButton');
+            $action->value = $actionDefinition['title'];
+            $action->href = $this->page->url(['data' => [
+                'action' => $actionDefinition['id']
+            ]]);
+            $buttonWrapper->add($action);
+        }
+        $actionForm->add($buttonWrapper);
+
+        // list current log entries
+        if (count($newLogEntries) > 0) {
+            $logOutput = $this->modules->get('InputfieldMarkup');
+            $logOutput->label = $this->_('Log output for the current action');
+            $logOutput->value = "<code><pre>" . implode("\n", array_map(function ($line) {
+                return $line['text'];
+            }, $newLogEntries)) . "</code></pre>";
+            $logOutput->columnWidth = 50;
+            $logOutput->collapsed = Inputfield::collapsedNever;
+            $actionForm->add($logOutput);
+        }
+
+        return $actionForm->render();
         // @TODO build buttons for all actions
         // @TODO output log of last clearing
         return 'Hello World :)';
@@ -150,7 +182,7 @@ class ProcessCacheControl extends Process implements Module
                 sprintf(
                     $this->_('Removed all files from the following cache directories (below %1$s): %2$s'),
                     $this->wire('config')->paths->cache,
-                    implode(', ', $this->ClearCacheDirectories),
+                    implode(', ', $this->ClearCacheDirectories)
                 )
             );
             if (in_array(PageRender::cacheDirName, $this->ClearCacheDirectories)) {
@@ -161,7 +193,10 @@ class ProcessCacheControl extends Process implements Module
             }
         }
 
-        // @TODO Clear cache timestamps
+        // clear cache timestamps
+        if ($this->ClearAllAssetVersions) {
+            $tools->clearAllAssetVersions();
+        }
     }
 
     public function parseNamespaceList(string $namespaces) {
