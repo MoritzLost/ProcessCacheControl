@@ -23,6 +23,14 @@ class CacheControlTools extends Wire
         $this->log = $this->wire('log');
     }
 
+    /**
+     * Clear all files and directories in the specified folder inside the site's
+     * cache directory. Includes a safety check to never delete anything outside
+     * the cache directory.
+     *
+     * @param string $directory The name of the folder to clear, without a leading slash.
+     * @return void
+     */
     public function clearCacheDirectoryContent(string $directory): void
     {
         $dirPath = $this->config->paths->cache . $directory;
@@ -47,6 +55,13 @@ class CacheControlTools extends Wire
         }
     }
 
+    /**
+     * Clears out all cache entries for the specified namespaces using
+     * ProcessWire's cache API ($cache / WireCache).
+     *
+     * @param array $namespaces An array of cache namespaces to clear.
+     * @return void
+     */
     public function clearWireCacheByNamespaces(array $namespaces): void
     {
         foreach ($namespaces as $namespace) {
@@ -54,6 +69,12 @@ class CacheControlTools extends Wire
         }
     }
 
+    /**
+     * Get the stored asset version string to append to asset source URLs.
+     *
+     * @param string $type  Optional asset class / category.
+     * @return string
+     */
     public function getAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY): string
     {
         return $this->cache->getFor(
@@ -66,7 +87,14 @@ class CacheControlTools extends Wire
         );
     }
 
-    public function refreshAssetVersion(?string $type = self::ASSET_CACHE_DEFAULT_KEY, ?string $version): void
+    /**
+     * Refresh the stored asset version string.
+     *
+     * @param string|null $type     Optional asset class / category to refresh the version for.
+     * @param string|null $version  The new version to store. Defaults to the curernt timestamp.
+     * @return void
+     */
+    public function refreshAssetVersion(?string $type = self::ASSET_CACHE_DEFAULT_KEY, ?string $version = null): void
     {
         $this->cache->setFor(
             self::ASSET_CACHE_NAMESPACE,
@@ -75,8 +103,34 @@ class CacheControlTools extends Wire
         );
     }
 
+    /**
+     * Clear out all stored asset versions. New version strings will be
+     * automatically generated the next time they are requested.
+     *
+     * @return void
+     */
     public function clearAllAssetVersions(): void
     {
         $this->cache->deleteFor(self::ASSET_CACHE_NAMESPACE);
+    }
+
+    /**
+     * The following are utility
+     */
+
+    /**
+     * @see ProcessCacheControl::logMessage
+     */
+    public function logMessage(string $message): void
+    {
+        $this->modules->get('ProcessCacheControl')->logMessage($message);
+    }
+
+    /**
+     * @see ProcessCacheControl::getNewLogMessages
+     */
+    public function getNewLogMessages(): array
+    {
+        return $this->modules->get('ProcessCacheControl')->getNewLogMessages();
     }
 }
