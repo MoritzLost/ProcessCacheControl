@@ -3,12 +3,21 @@ namespace ProcessWire\ProcessCacheControl;
 
 use ProcessWire\Wire;
 use ProcessWire\WireCache;
+use ProcessWire\PageRender;
 
 class CacheControlTools extends Wire
 {
+    /** @var string The cache namespace for storing asset versions in the database */
     public const ASSET_CACHE_NAMESPACE = 'cache-control-assets';
 
+    /** @var string The default asset type / category if none is specified */
     public const ASSET_CACHE_DEFAULT_KEY = 'default';
+
+    /** @var string The name of the system log for this module */
+    public const LOG_NAME = 'cache-control';
+
+    /** @var bool Whether the methods on this instance will log output on their own */
+    protected $silent = false;
 
     protected $config;
     protected $cache;
@@ -24,17 +33,110 @@ class CacheControlTools extends Wire
     }
 
     /**
+     * Turn off all logging done by the helper methods of this module. You can
+     * still call logMessage to log messages manually.
+     *
+     * @return self
+     */
+    public function silent(): self
+    {
+        $this->silent = true;
+        return $this;
+    }
+
+    /**
+     * Turn the logging done by helper methods back on.
+     *
+     * @return self
+     */
+    public function verbose(): self
+    {
+        $this->silent = false;
+        return $this;
+    }
+
+    /**
+     * Get the stored asset version string to append to asset source URLs. Generates
+     * a new version string if none exists.
+     *
+     * @param string $type  Optional asset class / category.
+     * @return string
+     */
+    public function getAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY): string
+    {
+        return $this->cache->getFor(
+            self::ASSET_CACHE_NAMESPACE,
+            $type,
+            function () use ($type) {
+                return $this->refreshAssetVersion($type);
+            }
+        );
+    }
+
+    /**
+     * Refresh the stored asset version string and return it.
+     *
+     * @param string $type          Optional asset class / category to refresh the version for.
+     * @param string|null $version  The new version to store. Defaults to the curernt timestamp.
+     * @return string
+     */
+    public function refreshAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY, ?string $version = null): string
+    {
+        $version = $version ?? time();
+        $this->cache->saveFor(
+            self::ASSET_CACHE_NAMESPACE,
+            $type,
+            $version,
+            WireCache::expireReserved
+        );
+        if (!$this->silent) {
+            $this->logMessage(sprintf(
+                $this->_('Updated the asset version for type %1$s to: %2$s'),
+                $type,
+                $version
+            ));
+        }
+        return $version;
+    }
+
+    /**
+     * Clear out all stored asset versions. New version strings will be
+     * automatically generated the next time they are requested.
+     *
+     * @return self
+     */
+    public function clearAllAssetVersions(): self
+    {
+        $this->cache->deleteFor(self::ASSET_CACHE_NAMESPACE);
+        if (!$this->silent) {
+            $this->logMessage($this->_('Cleared all stored asset versions.'));
+        }
+        return $this;
+    }
+
+    /**
      * Clear all files and directories in the specified folder inside the site's
      * cache directory. Includes a safety check to never delete anything outside
      * the cache directory.
      *
      * @param string $directory The name of the folder to clear, without a leading slash.
-     * @return void
+     * @return self
      */
-    public function clearCacheDirectoryContent(string $directory): void
+    public function clearCacheDirectoryContent(string $directory): self
     {
         $dirPath = $this->config->paths->cache . $directory;
-        if (!is_dir($dirPath)) return;
+        $dirPathFromRoot = $this->config->urls->cache . $directory;
+        // check if the directory exists, and exit early if it doesn't
+        if (!is_dir($dirPath)) {
+            if (!$this->silent) {
+                $this->logMessage(sprintf(
+                    $this->_('Skipped request to delete missing folder: %s'),
+                    $dirPathFromRoot
+                ));
+            }
+            return $this;
+        }
+        // iterate over all contents of the directory and remove them recursively
         $dirIterator = new \DirectoryIterator($dirPath);
         $cacheLimitPath = $this->config->paths->cache;
         foreach ($dirIterator as $fileinfo) {
@@ -53,6 +155,19 @@ class CacheControlTools extends Wire
                 );
             }
         }
+        // log the result
+        if (!$this->silent) {
+            // special case: the "Page" directory contains the template render cache
+            if ($directory === PageRender::cacheDirName) {
+                $this->logMessage($this->_('Cleared the template render cache.'));
+            } else {
+                $this->logMessage(sprintf(
+                    $this->_('Removed all files from the following cache directory: %s'),
+                    $dirPathFromRoot
+                ));
+            }
+        }
+        return $this;
     }
 
     /**
@@ -60,77 +175,37 @@ class CacheControlTools extends Wire
      * ProcessWire's cache API ($cache / WireCache).
      *
      * @param array $namespaces An array of cache namespaces to clear.
-     * @return void
+     * @return self
      */
-    public function clearWireCacheByNamespaces(array $namespaces): void
+    public function clearWireCacheByNamespaces(array $namespaces): self
     {
         foreach ($namespaces as $namespace) {
             $this->cache->deleteFor($namespace);
         }
+        if (!$this->silent) {
+            $this->logmessage(sprintf(
+                $this->_('Deleted WireCache entries for the following namespaces: %s'),
+                implode(', ', $namespaces)
+            ));
+        }
+        return $this;
     }
 
     /**
-     * Get the stored asset version string to append to asset source URLs.
+     * Log a message in the dedicated log file for this module. Newly added
+     * cache actions should use this method to log messages about what they are
+     * doing. The module page will automatically display all messages during
+     * this page view.
      *
-     * @param string $type  Optional asset class / category.
-     * @return string
+     * @param string $message   The message to log.
+     * @return self
      */
-    public function getAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY): string
+    public function logMessage(string $message): self
     {
-        return $this->cache->getFor(
-            self::ASSET_CACHE_NAMESPACE,
-            $type,
-            WireCache::expireReserved,
-            function () use ($type) {
-                return $type . '-' . time();
-            }
+        $this->log->save(
+            self::LOG_NAME,
+            $message
         );
-    }
-
-    /**
-     * Refresh the stored asset version string.
-     *
-     * @param string|null $type     Optional asset class / category to refresh the version for.
-     * @param string|null $version  The new version to store. Defaults to the curernt timestamp.
-     * @return void
-     */
-    public function refreshAssetVersion(?string $type = self::ASSET_CACHE_DEFAULT_KEY, ?string $version = null): void
-    {
-        $this->cache->setFor(
-            self::ASSET_CACHE_NAMESPACE,
-            $type . '-' . time(),
-            WireCache::expireReserved
-        );
-    }
-
-    /**
-     * Clear out all stored asset versions. New version strings will be
-     * automatically generated the next time they are requested.
-     *
-     * @return void
-     */
-    public function clearAllAssetVersions(): void
-    {
-        $this->cache->deleteFor(self::ASSET_CACHE_NAMESPACE);
-    }
-
-    /**
-     * The following are utility
-     */
-
-    /**
-     * @see ProcessCacheControl::logMessage
-     */
-    public function logMessage(string $message): void
-    {
-        $this->modules->get('ProcessCacheControl')->logMessage($message);
-    }
-
-    /**
-     * @see ProcessCacheControl::getNewLogMessages
-     */
-    public function getNewLogMessages(): array
-    {
-        return $this->modules->get('ProcessCacheControl')->getNewLogMessages();
+        return $this;
     }
 }

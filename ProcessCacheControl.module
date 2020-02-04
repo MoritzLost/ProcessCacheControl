@@ -8,40 +8,36 @@ class ProcessCacheControl extends Process implements Module
     /** @var string The name of the GET parameter that determines the action to perform. */
     public const ACTION_PARAMETER_NAME = 'action';
 
-    /** @var string The name of the system log for this module. */
-    public const LOG_NAME = 'cache-control';
+    public const MODULE_PERMISSION = 'cache-control';
 
-    /** @var int Will hold the amount of log messages at startup, to determine which log entries are new. */
-    protected $initialLogTotal;
+    public const ACTION_PERMISSION_FORMAT = '%1$s-%2$s';
 
     public static function getModuleInfo()
     {
         return [
             'title' => __('Cache Control'),
-            'summary' => '',
+            'summary' => __('Adds an entry to the setup menu to clear all caches. Provides an API to add cache management actions and an interface to execute them.'),
             'author' => "Moritz L'Hoest",
+            'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
             'version' => '0.1.0',
             'icon' => 'floppy-o',
             'autoload' => true,
             'singular' => true,
             'useNavJSON' => true,
-
             'requires' => [
                 'ProcessWire>=3.0.130',
                 'PHP>=7.1',
             ],
-
+            'permission' => self::MODULE_PERMISSION,
+            'permissions' => [
+                self::MODULE_PERMISSION => __('Use the cache control interface provided by the ProcessCacheControl module and execute cache control actions.')
+            ],
             'page' => [
                 'name' => 'cache-control',
                 'parent' => 'setup',
-                'title' => 'Cache Control',
+                'title' => __('Cache Control'),
             ],
         ];
-    }
-
-    public function __construct()
-    {
-        $this->initialLogTotal = $this->log->getTotalEntries(self::LOG_NAME);
     }
 
     /**
@@ -90,16 +86,37 @@ class ProcessCacheControl extends Process implements Module
      * @param string $actionId
      * @return void
      */
-    public function performCacheClearAction(string $actionId): void
+    public function ___executeAction(string $actionId): void
     {
+        // get the action definition, if it exists
         $actionDefinition = $this->getActionDefinitionById($actionId);
         if (null === $actionDefinition) {
             throw new \InvalidArgumentException(
                 sprintf($this->_('Action with ID %s does not exist.'), $actionId)
             );
         }
-        // @TODO check permission
-        call_user_func($actionDefinition['callback'], new CacheControlTools());
+        // if a specific permission for this action exists, the user needs it in order
+        // to execute this action. otherwise, the user only needs the general
+        // cache-control permission
+        $actionPermissionName = $this->getActionPermissionName($actionId);
+        $hasModulePermission = $this->user->hasPermission(self::MODULE_PERMISSION);
+        $actionPermissionExists = $this->permissions->has($actionPermissionName);
+        $hasActionPermission = $actionPermissionExists && $this->user->hasPermission($actionPermissionName);
+        $actionAllowed = $actionPermissionExists ? $hasModulePermission && $hasActionPermission : $hasModulePermission;
+        if (!$actionAllowed) {
+            $permissionDeniedMessage = $actionPermissionExists
+                ? $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permissions: %3$s / %4$s')
+                : $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permission: %3$s');
+            (new CacheControlTools)->logMessage(sprintf(
+                $permissionDeniedMessage,
+                $this->user->name,
+                $actionId,
+                self::MODULE_PERMISSION,
+                $actionPermissionName,
+            ));
+        } else {
+            call_user_func($actionDefinition['callback'], new CacheControlTools());
+        }
     }
 
     /**
@@ -109,93 +126,100 @@ class ProcessCacheControl extends Process implements Module
      * @param CacheControlTools|null $tools
      * @return void
      */
-    public function clearAll(?CacheControlTools $tools): void
+    public function ___clearAll(?CacheControlTools $tools): void
     {
         // automatically instantiate $tools so the method can be called without arguments
-        if (null === $tools) $tools = new CacheControlTools();
+        if (null === $tools) $tools = (new CacheControlTools())->verbose();
 
+        // clear all configured specified entries / namespaces in the database cache
         $cache = $this->wire('cache');
         if ($this->WireCacheExpireAll) {
             $cache->expireAll();
-            $this->logMessage($this->_('Expired all WireCache entries for an expiration data ($cache->expireAll()).'));
+            $tools->logMessage($this->_('Expired all WireCache entries that have an expiration data ($cache->expireAll()).'));
         }
         if ($this->WireCacheDeleteAll) {
             $cache->deleteAll();
-            $this->logMessage($this->_('Deleted all WireCache entries except for reserved system entries ($cache->deleteAll()).'));
+            $tools->logMessage($this->_('Deleted all WireCache entries except for reserved system entries ($cache->deleteAll()).'));
         }
         if (!empty($namespaceList = $this->parseNamespaceList($this->WireCacheDeleteNamespaces))) {
             $tools->clearWireCacheByNamespaces($namespaceList);
-            $this->logmessage(sprintf(
-                $this->_('Deleted WireCache entries for the following namespaces: %s'),
-                implode(', ', $namespaceList)
-            ));
         }
 
-        // Clear selected cache directories
+        // clear selected cache directories
         if ($this->ClearCacheDirectories) {
             foreach ($this->ClearCacheDirectories as $dir) {
                 $tools->clearCacheDirectoryContent($dir);
             }
-            $this->logMessage(sprintf(
-                $this->_('Removed all files from the following cache directories (below %1$s): %2$s'),
-                $this->wire('config')->paths->cache,
-                implode(', ', $this->ClearCacheDirectories)
-            ));
-            if (in_array(PageRender::cacheDirName, $this->ClearCacheDirectories)) {
-                $this->logMessage($this->_('Cleared the template cache.'));
-            }
         }
 
-        // clear cache timestamps
+        // clear all stored asset versions
         if ($this->ClearAllAssetVersions) {
             $tools->clearAllAssetVersions();
         }
     }
 
     /**
-     * Log a message in the dedicated log file for this module. Newly added
-     * cache actions should use this method to log messages about what they are
-     * doing. The module page will automatically display all messages during
-     * this page view.
+     * The main Process that gets executed on the module's page. Performs the
+     * action specified as a GET parameter (if any) and outputs all new log
+     * messages. Will also display buttons for all available cache actions.
      *
-     * @param string $message   The message to log.
      * @return void
      */
-    public function logMessage(string $message): void
+    public function ___execute()
     {
-        $this->log->save(
-            self::LOG_NAME,
-            $message
-        );
-    }
+        // save the current amount of log messages, so we can determine all new
+        // log messages after executing the cache clear action
+        $previousLogTotal = $this->log->getTotalEntries(CacheControlTools::LOG_NAME);
 
-    /**
-     * Get all new messages from this module's system log that were added during
-     * this page view, or since the last time this method was called.
-     *
-     * @return array
-     */
-    public function getNewLogMessages(): array
-    {
-        $newLogTotal = $this->log->getTotalEntries(self::LOG_NAME);
-        $newLogEntries = $newLogTotal > $this->initialLogTotal
-            ? $this->log->getEntries(self::LOG_NAME, [
-                    'limit' => $newLogTotal - $this->initialLogTotal,
-                    'reverse' => false,
-                ])
-            : [];
-        $this->initialLogTotal = $newLogTotal;
-        return $newLogEntries;
-    }
+        // if the URL specifies an action, execute it
+        $actionId = $this->wire('input')->get(self::ACTION_PARAMETER_NAME);
+        if ($actionId) {
+            $this->executeAction($actionId);
+        }
 
-    /**
-     * Get a new instance of the CacheControlTools utility class.
-     *
-     * @return CacheControlTools
-     */
-    public function getTools(): CacheControlTools
-    {
-        return new CacheControlTools();
+        // get all new log messages that were added by the cache clear action
+        $newLogTotal = $this->log->getTotalEntries(CacheControlTools::LOG_NAME);
+        $newLogEntries = $newLogTotal > $previousLogTotal
+            ? array_reverse($this->log->getEntries(CacheControlTools::LOG_NAME, [
+                    'limit' => $newLogTotal - $previousLogTotal,
+                ]))
+            : null;
+
+        // the following generates the module page output
+
+        // list available actions
+        $buttonWrapper = $this->modules->get('InputfieldFieldset');
+        $buttonWrapper->label = $this->_('Available Cache Control Actions');
+        $buttonWrapper->columnWidth = 50;
+        $buttonWrapper->collapsed = Inputfield::collapsedNever;
+        foreach ($this->getActionDefinitions() as $actionDefinition) {
+            $action = $this->modules->get('InputfieldButton');
+            $action->value = $actionDefinition['title'];
+            $action->href = $this->page->url(['data' => [
+                'action' => $actionDefinition['id']
+            ]]);
+            $buttonWrapper->add($action);
+        }
+
+        // list new log entries
+        $logOutput = $this->modules->get('InputfieldMarkup');
+        $logOutput->label = $this->_('Log output for the current action');
+        $logOutput->columnWidth = 50;
+        $logOutput->collapsed = Inputfield::collapsedNever;
+        if ($newLogEntries) {
+            $logOutput->value = "<code><pre>" . implode("\n", array_map(function ($line) {
+                return $line['text'];
+            }, $newLogEntries)) . "</code></pre>";
+        } else {
+            $logOutput->value = sprintf("<p>%s</p>", $this->_('No new log entries. Start a job by selecting one of the options to the left.'));
+        }
+
+        // wrap everything inside a form inputfield
+        $actionForm = $this->modules->get('InputfieldForm');
+        $actionForm->add($buttonWrapper);
+        $actionForm->add($logOutput);
+
+        return $actionForm->render();
     }
 
     /**
@@ -214,52 +238,22 @@ class ProcessCacheControl extends Process implements Module
     }
 
     /**
-     * The main Process that gets executed on the module's page. Performs the
-     * action specified as a GET parameter (if any) and outputs all new log
-     * messages. Will also display buttons for all available cache actions.
+     * Get a new instance of the CacheControlTools utility class.
      *
-     * @return void
+     * @return CacheControlTools
      */
-    public function ___execute()
+    public function getTools(): CacheControlTools
     {
-        $actionId = $this->wire('input')->get(self::ACTION_PARAMETER_NAME);
-        if ($actionId) {
-            $this->performCacheClearAction($actionId);
-        }
+        return new CacheControlTools();
+    }
 
-        // generate module output
-        $actionForm = $this->modules->get('InputfieldForm');
-
-        // list available actions
-        $buttonWrapper = $this->modules->get('InputfieldFieldset');
-        $buttonWrapper->label = $this->_('Available Cache Control Actions');
-        $buttonWrapper->columnWidth = 50;
-        $buttonWrapper->collapsed = Inputfield::collapsedNever;
-        foreach ($this->getActionDefinitions() as $actionDefinition) {
-            $action = $this->modules->get('InputfieldButton');
-            $action->value = $actionDefinition['title'];
-            $action->href = $this->page->url(['data' => [
-                'action' => $actionDefinition['id']
-            ]]);
-            $buttonWrapper->add($action);
-        }
-        $actionForm->add($buttonWrapper);
-
-        // list current log entries
-        $logOutput = $this->modules->get('InputfieldMarkup');
-        $logOutput->label = $this->_('Log output for the current action');
-        $logOutput->columnWidth = 50;
-        $logOutput->collapsed = Inputfield::collapsedNever;
-        if ($newLogEntries = $this->getNewLogMessages()) {
-            $logOutput->value = "<code><pre>" . implode("\n", array_map(function ($line) {
-                return $line['text'];
-            }, $newLogEntries)) . "</code></pre>";
-        } else {
-            $logOutput->value = sprintf("<p>%s</p>", $this->_('No new log entries. Start a job by selecting one of the options to the left.'));
-        }
-        $actionForm->add($logOutput);
-
-        return $actionForm->render();
+    public function getActionPermissionName(string $actionId): string
+    {
+        return sprintf(
+            self::ACTION_PERMISSION_FORMAT,
+            self::MODULE_PERMISSION,
+            $actionId
+        );
     }
 
     /**
@@ -291,33 +285,5 @@ class ProcessCacheControl extends Process implements Module
             }
         }
         return null;
-    }
-
-    /**
-     * Method aliases for the Cache Control Tools asset methods for convenience.
-     */
-
-    /**
-     * @see CacheControlTools::getAssetVersion
-     */
-    public function getAssetVersion(string $type = CacheControlTools::ASSET_CACHE_DEFAULT_KEY): string
-    {
-        return (new CacheControlTools())->getAssetVersion($type);
-    }
-
-    /**
-     * @see CacheControlTools::refreshAssetVersion
-     */
-    public function refreshAssetVersion(?string $type = CacheControlTools::ASSET_CACHE_DEFAULT_KEY, ?string $version = null): void
-    {
-        (new CacheControlTools())->refreshAssetVersion($type, $version);
-    }
-
-    /**
-     * @see CacheControlTools::refreshAssetVersion
-     */
-    public function clearAllAssetVersions(): void
-    {
-        (new CacheControlTools())->clearAllAssetVersions();
     }
 }
