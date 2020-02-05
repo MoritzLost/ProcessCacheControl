@@ -14,6 +14,9 @@ class ProcessCacheControl extends Process implements Module
     /** @var string The format for optional action-specific permissions. @see self::getActionPermissionName */
     public const ACTION_PERMISSION_FORMAT = '%1$s-%2$s';
 
+    /** @var string The ID of the default cache action */
+    public const DEFAULT_ACTION_ID = 'all';
+
     public static function getModuleInfo()
     {
         return [
@@ -73,7 +76,7 @@ class ProcessCacheControl extends Process implements Module
     {
         return [
             [
-                'id' => 'all',
+                'id' => self::DEFAULT_ACTION_ID,
                 'title' => $this->_('Clear all'),
                 'icon' => 'floppy-o',
                 'callback' => [$this, 'clearAll'],
