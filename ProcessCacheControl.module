@@ -8,8 +8,10 @@ class ProcessCacheControl extends Process implements Module
     /** @var string The name of the GET parameter that determines the action to perform. */
     public const ACTION_PARAMETER_NAME = 'action';
 
+    /** @var string The base name for the required permission for using this module */
     public const MODULE_PERMISSION = 'cache-control';
 
+    /** @var string The format for optional action-specific permissions. @see self::getActionPermissionName */
     public const ACTION_PERMISSION_FORMAT = '%1$s-%2$s';
 
     public static function getModuleInfo()
@@ -72,7 +74,7 @@ class ProcessCacheControl extends Process implements Module
         return [
             [
                 'id' => 'all',
-                'title' => __('Clear all'),
+                'title' => $this->_('Clear all'),
                 'icon' => 'floppy-o',
                 'callback' => [$this, 'clearAll'],
             ],
@@ -185,7 +187,7 @@ class ProcessCacheControl extends Process implements Module
                 ]))
             : null;
 
-        // the following generates the module page output
+        // the following code generates the module page output
 
         // list available actions
         $buttonWrapper = $this->modules->get('InputfieldFieldset');
@@ -247,6 +249,12 @@ class ProcessCacheControl extends Process implements Module
         return new CacheControlTools();
     }
 
+    /**
+     * Get the name of the optional permission for the passed action ID.
+     *
+     * @param string $actionId  The ID to get the permission name for.
+     * @return string
+     */
     public function getActionPermissionName(string $actionId): string
     {
         return sprintf(
