@@ -16,7 +16,7 @@ class CacheControlTools extends Wire
     /** @var string The name of the system log for this module */
     public const LOG_NAME = 'cache-control';
 
-    /** @var bool Whether the methods on this instance will log output on their own */
+    /** @var bool If this is true, all helper methods will not write any log messages */
     protected $silent = false;
 
     protected $config;
@@ -89,13 +89,11 @@ class CacheControlTools extends Wire
             $version,
             WireCache::expireReserved
         );
-        if (!$this->silent) {
-            $this->logMessage(sprintf(
-                $this->_('Updated the asset version for type %1$s to: %2$s'),
-                $type,
-                $version
-            ));
-        }
+        $this->logMessageIfNotSilent(sprintf(
+            $this->_('Updated the asset version for type %1$s to: %2$s'),
+            $type,
+            $version
+        ));
         return $version;
     }
 
@@ -108,9 +106,7 @@ class CacheControlTools extends Wire
     public function clearAllAssetVersions(): self
     {
         $this->cache->deleteFor(self::ASSET_CACHE_NAMESPACE);
-        if (!$this->silent) {
-            $this->logMessage($this->_('Cleared all stored asset versions.'));
-        }
+        $this->logMessageIfNotSilent($this->_('Cleared all stored asset versions.'));
         return $this;
     }
 
@@ -128,12 +124,10 @@ class CacheControlTools extends Wire
         $dirPathFromRoot = $this->config->urls->cache . $directory;
         // check if the directory exists, and exit early if it doesn't
         if (!is_dir($dirPath)) {
-            if (!$this->silent) {
-                $this->logMessage(sprintf(
-                    $this->_('Skipped request to delete missing folder: %s'),
-                    $dirPathFromRoot
-                ));
-            }
+            $this->logMessageIfNotSilent(sprintf(
+                $this->_('Skipped request to delete missing folder: %s'),
+                $dirPathFromRoot
+            ));
             return $this;
         }
         // iterate over all contents of the directory and remove them recursively
@@ -156,16 +150,14 @@ class CacheControlTools extends Wire
             }
         }
         // log the result
-        if (!$this->silent) {
+        if ($directory === PageRender::cacheDirName) {
             // special case: the "Page" directory contains the template render cache
-            if ($directory === PageRender::cacheDirName) {
-                $this->logMessage($this->_('Cleared the template render cache.'));
-            } else {
-                $this->logMessage(sprintf(
-                    $this->_('Removed all files from the following cache directory: %s'),
-                    $dirPathFromRoot
-                ));
-            }
+            $this->logMessageIfNotSilent($this->_('Cleared the template render cache.'));
+        } else {
+            $this->logMessageIfNotSilent(sprintf(
+                $this->_('Removed all files from the following cache directory: %s'),
+                $dirPathFromRoot
+            ));
         }
         return $this;
     }
@@ -182,12 +174,10 @@ class CacheControlTools extends Wire
         foreach ($namespaces as $namespace) {
             $this->cache->deleteFor($namespace);
         }
-        if (!$this->silent) {
-            $this->logmessage(sprintf(
-                $this->_('Deleted WireCache entries for the following namespaces: %s'),
-                implode(', ', $namespaces)
-            ));
-        }
+        $this->logMessageIfNotSilent(sprintf(
+            $this->_('Deleted WireCache entries for the following namespaces: %s'),
+            implode(', ', $namespaces)
+        ));
         return $this;
     }
 
@@ -206,6 +196,19 @@ class CacheControlTools extends Wire
             self::LOG_NAME,
             $message
         );
+        return $this;
+    }
+
+    /**
+     * Log a message only if this instance is not currently set to silent.
+     *
+     * @see self::logMessage
+     */
+    public function logMessageIfNotSilent(string $message): self
+    {
+        if (!$this->isSilent) {
+            $this->logMessage($message);
+        }
         return $this;
     }
 }
