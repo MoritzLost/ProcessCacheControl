@@ -16,7 +16,6 @@ class ProcessCacheControlConfig extends ModuleConfig
                 'Page'
             ],
             'ClearAllAssetVersions' => true,
-            // CLEAR ACTIVE SESSIONS (// except current user?)?
         ];
     }
 
@@ -24,37 +23,41 @@ class ProcessCacheControlConfig extends ModuleConfig
     {
         $inputfields = parent::getInputfields();
 
+        // expire all caches
         $WireCacheExpireAll = wire()->modules->get('InputfieldCheckbox');
         $WireCacheExpireAll->name = 'WireCacheExpireAll';
         $WireCacheExpireAll->label = $this->_('Cache API: Expire all');
         $WireCacheExpireAll->label2 = $this->_('Expire all caches in the database that have an expiration date.');
-        // @TODO: Link to method in WireCache
+        $WireCacheExpireAll->notes = $this->_('See [$cache->expireAll](https://processwire.com/api/ref/wire-cache/expire-all/) in the API documentation.');
         $WireCacheExpireAll->columnWidth = 25;
         $WireCacheExpireAll->collapsed = Inputfield::collapsedNever;
 
+        // delete all caches
         $WireCacheDeleteAll = wire()->modules->get('InputfieldCheckbox');
         $WireCacheDeleteAll->name = 'WireCacheDeleteAll';
         $WireCacheDeleteAll->label = $this->_('Cache API: Delete all');
-        $WireCacheDeleteAll->checkboxOnly = false;
         $WireCacheDeleteAll->label2 = $this->_('Delete all caches in the database, except for the reserved system cache.');
-        // @TODO: Link to method in WireCache
+        $WireCacheDeleteAll->notes = $this->_('See [$cache->deleteAll](https://processwire.com/api/ref/wire-cache/delete-all/) in the API documentation.');
         $WireCacheDeleteAll->columnWidth = 25;
         $WireCacheDeleteAll->collapsed = Inputfield::collapsedNever;
 
+        // delete individual cache namespaces
         $WireCacheDeleteNamespaces = wire()->modules->get('InputfieldTextarea');
         $WireCacheDeleteNamespaces->name = 'WireCacheDeleteNamespaces';
         $WireCacheDeleteNamespaces->label = $this->_('Cache API: Delete caches by namespace.');
         $WireCacheDeleteNamespaces->description = $this->_('Specify one namespace per line. All cache entries in the database matching the specified namespace(s) will be deleted.');
-        $WireCacheDeleteNamespaces->notes = $this->_('You can use this to selectively clear  caches from specific namespaces. In this case, you may want to turn of the Expire all and Delete all options.');
+        $WireCacheDeleteNamespaces->notes = $this->_("You can use this to selectively clear caches from specific namespaces. In this case, you may want to turn of the Expire all and Delete all options.\n See [\$cache->deleteFor](https://processwire.com/api/ref/wire-cache/delete-for/) in the API documentation.");
         $WireCacheDeleteNamespaces->columnWidth = 50;
         $WireCacheDeleteNamespaces->collapsed = Inputfield::collapsedNever;
-        // @TODO: Link to documentation in WireCache
 
-        // Show location
+        // clear individual cache directories
         $ClearCacheDirectories = wire()->modules->get('InputfieldCheckboxes');
         $ClearCacheDirectories->name = 'ClearCacheDirectories';
         $ClearCacheDirectories->label = $this->_('Clear Cache Directories');
-        $ClearCacheDirectories->description = $this->_("Select which folders in your site's cache directory you want to clear.");
+        $ClearCacheDirectories->description = sprintf(
+            $this->_("Select which folders in your site's cache directory you want to clear.\n Current cache directory: `%s`"),
+            $this->config->urls->cache
+        );
         $ClearCacheDirectories->notes = $this->_("If a 'Page' entry exists it should always be selected, as it contains the template render cache.\n If a folder in your cache directory does not appear in this list, it may not be writable by the server.");
         $ClearCacheDirectories->columnWidth = 50;
         $cacheDirectories = $this->getCacheDirectories();
@@ -67,6 +70,7 @@ class ProcessCacheControlConfig extends ModuleConfig
         $ClearAllAssetVersions->name = 'ClearAllAssetVersions';
         $ClearAllAssetVersions->label = $this->_('Asset versions');
         $ClearAllAssetVersions->label2 = $this->_('Refresh all stored asset versions.');
+        $ClearAllAssetVersions->notes = $this->_('This requires some setup in your templates. See the [documentation](https://github.com/MoritzLost/ProcessCacheControl) for details.');
         $ClearAllAssetVersions->columnWidth = 50;
         $ClearAllAssetVersions->collapsed = Inputfield::collapsedNever;
 
@@ -75,7 +79,6 @@ class ProcessCacheControlConfig extends ModuleConfig
         $defaultActionFieldset->label = $this->_('Default "Clear All" action');
         $defaultActionFieldset->description = $this->_('Those options control what happens when you the default "Clear all" action is executed. Consult the documentation to find out how to add custom actions to the module.');
         $defaultActionFieldset->collapsed = Inputfield::collapsedNo;
-
         $defaultActionFieldset->add($WireCacheExpireAll);
         $defaultActionFieldset->add($WireCacheDeleteAll);
         $defaultActionFieldset->add($WireCacheDeleteNamespaces);
@@ -83,10 +86,14 @@ class ProcessCacheControlConfig extends ModuleConfig
         $defaultActionFieldset->add($ClearAllAssetVersions);
 
         $inputfields->add($defaultActionFieldset);
-
         return $inputfields;
     }
 
+    /**
+     * Get all all writable folders in the site's cache directory.
+     *
+     * @return array
+     */
     protected function getCacheDirectories(): array
     {
         $cacheDir = $this->config->paths->cache;

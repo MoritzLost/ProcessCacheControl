@@ -35,6 +35,8 @@ By default, only one _Clear all_ cache action is available. You can change the b
 
 The module configuration provides some options to change that behaviour. In particular, you can select folders in your site's cache directory to be cleared out as well. This allows you to clear site-specific cache folders as well, such as the Twig compilation cache or the ProCache static cache.
 
+Go to Modules -> Configure -> ProcessCacheControl to configure the default _Clear all_ action.
+
 ## HTTP cache busting for assets
 
 For your static assets (JavaScript and CSS files, for example), you want the browser to store those as long as possible. This is why you usually want to sent `Cache-Control` or `Expires` headers that specify the lifetime of an asset. For Apache, a sample configuration could look like this:
