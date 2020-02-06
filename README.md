@@ -135,7 +135,7 @@ wire()->addHookAfter('ProcessCacheControl::getActionDefinitions', function (Hook
 - Of course, you can also write custom code inside the callback to perform whatever tasks you want.
 - To inform the user about what your cache action is doing, add log messages with `$tools->logMessage('Your message')`.
 - By default, the utility methods write some log messages on their own. To toggle this behaviour, simply call `$tools->silent()` and `$tools->verbose()` respectively.
-- For reference, check out the [action defintion of the default _Clear all_ action](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L62-L82) and the [corresponding callback](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L124-L161).
+- For reference, check out the [action defintion of the default _Clear all_ action](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L86-L91) and the [corresponding callback](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L135-L172).
 - If you want to remove the default action, simply replace the return value in your hook with an array of your custom actions instead of adding to it.
 
 ## Triggering cache actions through the API
