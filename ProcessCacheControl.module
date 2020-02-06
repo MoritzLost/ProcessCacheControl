@@ -45,22 +45,30 @@ class ProcessCacheControl extends Process implements Module
         ];
     }
 
-    /**
-     * Called by ProcessWire during module initialization. Add's the namespace
-     * for this module to the autoloader.
-     *
-     * @return void
-     */
-    public function init()
+    public function __construct()
     {
         // add namespace to autoload module classes
         $namespace = 'ProcessWire\\ProcessCacheControl';
-        $srcPath = $this->wire('config')->paths->get($this) . 'src/';
         $classLoader = $this->wire('classLoader');
         if (!$classLoader->hasNamespace($namespace)) {
+            $srcPath = $this->wire('config')->paths->get($this) . 'src/';
             $classLoader->addNamespace($namespace, $srcPath);
         }
     }
+
+    /**
+     * Called by ProcessWire during module installation.
+     *
+     * @return void
+     */
+    public function install()
+    {
+        // save an installation message to force creation of the cache-control log file if it doesnt exist yet
+        $tools = $this->getTools();
+        $tools->logMessage($this->_('ProcessCacheControl installed successfully. Creating the dedicated log file.'));
+        return parent::install();
+    }
+
 
     /**
      * Get all available cache actions. This method can be hooked to add
