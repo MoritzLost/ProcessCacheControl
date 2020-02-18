@@ -15,23 +15,14 @@ class ProcessCacheControl extends Process implements Module
     /** @var string The ID of the default cache action. */
     public const DEFAULT_ACTION_ID = 'all';
 
-    /** @var string The author of this module. */
-    public const AUTHOR = "Moritz L'Hoest";
-
-    /** @var string The link to the version control repository. */
-    public const REPOSITORY = 'https://github.com/MoritzLost/ProcessCacheControl';
-
-    /** @var string The current version of this module. */
-    public const VERSION = '0.4.0';
-
     public static function getModuleInfo()
     {
         return [
             'title' => __('Cache Control'),
             'summary' => __('Adds an entry to the setup menu to clear all caches. Provides an API to add cache management actions and an interface to execute them.'),
-            'author' => self::AUTHOR,
-            'href' => self::REPOSITORY,
-            'version' => self::VERSION,
+            'author' => "Moritz L'Hoest",
+            'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
+            'version' => '0.4.0',
             'icon' => 'floppy-o',
             'singular' => true,
             'useNavJSON' => true,

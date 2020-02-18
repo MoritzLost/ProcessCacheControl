@@ -17,9 +17,9 @@ class CacheControlTools extends Wire implements Module
         return [
             'title' => __('Cache Control Tools'),
             'summary' => __('Utility module installed alongside ProcessCacheControl to provide helper methods.'),
-            'author' => ProcessCacheControl::AUTHOR,
-            'href' => ProcessCacheControl::REPOSITORY,
-            'version' => ProcessCacheControl::VERSION,
+            'author' => "Moritz L'Hoest",
+            'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
+            'version' => '0.4.0',
             'icon' => 'floppy-o',
             'requires' => [
                 'ProcessCacheControl',
