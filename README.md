@@ -5,6 +5,7 @@ This is a module for the [ProcessWire CMF](https://processwire.com/) that adds a
 ## Table of Contents
 
 - [Motivation and breakdown](#description)
+- [Installation](#installation)
 - [Basic usage and configuration](#features)
 - [HTTP cache busting for assets](#http-cache-busting-for-assets)
 - [Defining additional cache actions](#defining-additional-cache-actions)
@@ -22,6 +23,17 @@ The fastest ProcessWire sites use multiple caching mechanisms to speed up page d
 - Other site-specific caching mechanisms, like [Twig's compilation cache](https://twig.symfony.com/doc/3.x/api.html#compilation-cache) if you're using Twig.
 
 This means that you have to clear all those caches whenever you deploy a change your site, often manually. This module aims to make that easier by providing a single _Clear all caches_ link in the admin interface that will clear all those caches immediately. As a developer, you can configure what exactly this button does, if you need some cache layers to be more persistent than others. You can also add different cache actions to the Cache Control interface through the API.
+
+## Installation
+
+The module can be downloaded through the ProcessWire backend using the module's class name `ProcessCacheControl`. Alternatively, you can grab the currently published version from the [module directory](https://modules.processwire.com/modules/process-cache-control/) or the [Github repository](https://github.com/MoritzLost/ProcessCacheControl).
+
+Note that the repository contains to separate modules:
+
+- `ProcessCacheControl` is the 'main' module, it provides the admin interface and the module configuration.
+- `CacheControlTools` is a utility module with fewer access restrictions that you can use to perform some actions directly.
+
+`ProcessCacheControl` installs and uninstalls `CacheControlTools` automatically alongside it.
 
 ## Basic usage and configuration
 
@@ -57,7 +69,7 @@ The problem with long cache times is that if you replace the files on the server
 This module provides an interface for managing those asset versions, and automatically refreshes them when all caches are cleared. All you need to do to make this work is to request the current version string from the module, and add it to your assets in the source code:
 
 ```php
-$CacheControlTools = wire('modules')->get('ProcessCacheControl')->getTools();
+$CacheControlTools = wire('modules')->get('CacheControlTools');
 $currentVersion = $CacheControlTools->getAssetVersion();
 <link rel="stylesheet" type="text/css" href="/site/css/main.css?v=<?= $currentVersion ?>">
 <script src="/site/js/main.js?v=<?= $currentVersion ?>"></script>
@@ -68,7 +80,7 @@ The first time `getAssetVersion()` in called, it will create a version string fr
 You can also specify asset categories, and have seperate versions for each of them:
 
 ```php
-$CacheControlTools = wire('modules')->get('ProcessCacheControl')->getTools();
+$CacheControlTools = wire('modules')->get('CacheControlTools');
  // you can use any asset category you want
 $cssVersion = $CacheControlTools->getAssetVersion('css');
 $jsVersion = $CacheControlTools->getAssetVersion('javascript');
@@ -97,7 +109,7 @@ $CacheControlTools->clearAllAssetVersions();
 
 ## Defining additional cache actions
 
-By default, the module provides only the _Clear all_ cache action that can be triggered from the setup menu or the module page. Additional actions can be added through a hook. A _cache action_ consists of a unique ID, a human-readable title and a callback that is called when the hook is executed. The callback needs to accept exactly one argument, which is an instance of the utility class `\ProcessWire\ProcessCacheControl\CacheControlTools`.
+By default, the module provides only the _Clear all_ cache action that can be triggered from the setup menu or the module page. Additional actions can be added through a hook. A _cache action_ consists of a unique ID, a human-readable title and a callback that is called when the hook is executed. The callback needs to accept exactly one argument, which is an instance of the utility module `CacheControlTools`.
 
 To add cache actions to the module, hook after `ProcessCacheControl::getActionDefinitions`. This methods returns an array of cache actions. You can add your own actions by modifying the return value.
 
@@ -110,7 +122,7 @@ wire()->addHookAfter('ProcessCacheControl::getActionDefinitions', function (Hook
         // the action will be displayed with this title in the flyout menu
         'title' => 'My Custom Action',
         // the callback to be called when this action is executed
-        'callback' => function (\ProcessWire\ProcessCacheControl\CacheControlTools $tools) {
+        'callback' => function (\ProcessWire\CacheControlTools $tools) {
             // clear the asset versions for asset category 'javascript'
             $tools->refreshAssetVersion('javascript');
 
@@ -131,16 +143,16 @@ wire()->addHookAfter('ProcessCacheControl::getActionDefinitions', function (Hook
 });
 ```
 
-- The `CacheControlTools` class has a couple of helper methods that you can use to invalidate database caches, clear out cache directories and refresh asset versions. Currently there is no external documentation, but the [source code is well documentated](src/CacheControlTools.php).
+- The `CacheControlTools` module has a couple of helper methods that you can use to invalidate database caches, clear out cache directories and refresh asset versions. Currently there is no external documentation, but the [source code is well documentated](CacheControlTools.module).
 - Of course, you can also write custom code inside the callback to perform whatever tasks you want.
 - To inform the user about what your cache action is doing, add log messages with `$tools->logMessage('Your message')`.
 - By default, the utility methods write some log messages on their own. To toggle this behaviour, simply call `$tools->silent()` and `$tools->verbose()` respectively.
-- For reference, check out the [action defintion of the default _Clear all_ action](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L86-L91) and the [corresponding callback](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L135-L172).
+- For reference, check out the [action defintion of the default _Clear all_ action](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L72-L79) and the [corresponding callback](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L122-L159).
 - If you want to remove the default action, simply replace the return value in your hook with an array of your custom actions instead of adding to it.
 
 ## Triggering cache actions through the API
 
-You can manually execute cache actions through the API by using the ID you defined in the previous step. This way, the module will check if the current user has the permission to execute this action before executing it (see [permission system](#permission-system)).
+You can manually execute cache actions through the API by using the ID you defined in the previous step. This way, the module will check if the current user has the permission to execute this action before executing it (see [permission system](#permission-system)). Note that the module can only be instantiated if the current user has the `cache-control` permission.
 
 ```php
 $ProcessCacheControl = wire('modules')->get('ProcessCacheControl');

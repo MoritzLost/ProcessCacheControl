@@ -1,34 +1,41 @@
 <?php
 namespace ProcessWire;
 
-use ProcessWire\ProcessCacheControl\CacheControlTools;
-
 class ProcessCacheControl extends Process implements Module
 {
     /** @var string The name of the GET parameter that determines the action to perform. */
     public const ACTION_PARAMETER_NAME = 'action';
 
-    /** @var string The base name for the required permission for using this module */
+    /** @var string The base name for the required permission for using this module. */
     public const MODULE_PERMISSION = 'cache-control';
 
     /** @var string The format for optional action-specific permissions. @see self::getActionPermissionName */
     public const ACTION_PERMISSION_FORMAT = '%1$s-%2$s';
 
-    /** @var string The ID of the default cache action */
+    /** @var string The ID of the default cache action. */
     public const DEFAULT_ACTION_ID = 'all';
+
+    /** @var string The author of this module. */
+    public const AUTHOR = "Moritz L'Hoest";
+
+    /** @var string The link to the version control repository. */
+    public const REPOSITORY = 'https://github.com/MoritzLost/ProcessCacheControl';
+
+    /** @var string The current version of this module. */
+    public const VERSION = '0.4.0';
 
     public static function getModuleInfo()
     {
         return [
             'title' => __('Cache Control'),
             'summary' => __('Adds an entry to the setup menu to clear all caches. Provides an API to add cache management actions and an interface to execute them.'),
-            'author' => "Moritz L'Hoest",
-            'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
-            'version' => '0.3.0',
+            'author' => self::AUTHOR,
+            'href' => self::REPOSITORY,
+            'version' => self::VERSION,
             'icon' => 'floppy-o',
-            'autoload' => true,
             'singular' => true,
             'useNavJSON' => true,
+            'installs' => 'CacheControlTools',
             'requires' => [
                 'ProcessWire>=3.0.130',
                 'PHP>=7.1',
@@ -45,17 +52,6 @@ class ProcessCacheControl extends Process implements Module
         ];
     }
 
-    public function __construct()
-    {
-        // add namespace to autoload module classes
-        $namespace = 'ProcessWire\\ProcessCacheControl';
-        $classLoader = $this->wire('classLoader');
-        if (!$classLoader->hasNamespace($namespace)) {
-            $srcPath = $this->wire('config')->paths->get($this) . 'src/';
-            $classLoader->addNamespace($namespace, $srcPath);
-        }
-    }
-
     /**
      * Called by ProcessWire during module installation.
      *
@@ -64,7 +60,7 @@ class ProcessCacheControl extends Process implements Module
     public function install()
     {
         // save an installation message to force creation of the cache-control log file if it doesnt exist yet
-        $tools = $this->getTools();
+        $tools = $this->modules->get('CacheControlTools');
         $tools->logMessage($this->_('ProcessCacheControl installed successfully. Creating the dedicated log file.'));
         return parent::install();
     }
@@ -120,7 +116,7 @@ class ProcessCacheControl extends Process implements Module
             $permissionDeniedMessage = $actionPermissionExists
                 ? $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permissions: %3$s / %4$s')
                 : $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permission: %3$s');
-            (new CacheControlTools)->logMessage(sprintf(
+            $this->modules->get('CacheControlTools')->logMessage(sprintf(
                 $permissionDeniedMessage,
                 $this->user->name,
                 $actionId,
@@ -128,7 +124,7 @@ class ProcessCacheControl extends Process implements Module
                 $actionPermissionName
             ));
         } else {
-            call_user_func($actionDefinition['callback'], new CacheControlTools());
+            call_user_func($actionDefinition['callback'], $this->modules->get('CacheControlTools'));
         }
     }
 
@@ -142,7 +138,7 @@ class ProcessCacheControl extends Process implements Module
     public function ___clearAll(?CacheControlTools $tools): void
     {
         // automatically instantiate $tools so the method can be called without arguments
-        if (null === $tools) $tools = (new CacheControlTools())->verbose();
+        if (null === $tools) $tools = $this->modules->get('CacheControlTools')->verbose();
 
         // clear all configured specified entries / namespaces in the database cache
         $cache = $this->wire('cache');
@@ -248,16 +244,6 @@ class ProcessCacheControl extends Process implements Module
         $options['edit'] = sprintf("?%s={id}", self::ACTION_PARAMETER_NAME);
         $options['items'] = $this->getActionDefinitions();
         return parent::___executeNavJSON($options);
-    }
-
-    /**
-     * Get a new instance of the CacheControlTools utility class.
-     *
-     * @return CacheControlTools
-     */
-    public function getTools(): CacheControlTools
-    {
-        return new CacheControlTools();
     }
 
     /**

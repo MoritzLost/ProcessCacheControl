@@ -1,11 +1,7 @@
 <?php
-namespace ProcessWire\ProcessCacheControl;
+namespace ProcessWire;
 
-use ProcessWire\Wire;
-use ProcessWire\WireCache;
-use ProcessWire\PageRender;
-
-class CacheControlTools extends Wire
+class CacheControlTools extends Wire implements Module
 {
     /** @var string The cache namespace for storing asset versions in the database */
     public const ASSET_CACHE_NAMESPACE = 'cache-control-assets';
@@ -16,21 +12,25 @@ class CacheControlTools extends Wire
     /** @var string The name of the system log for this module */
     public const LOG_NAME = 'cache-control';
 
+    public static function getModuleInfo()
+    {
+        return [
+            'title' => __('Cache Control Tools'),
+            'summary' => __('Utility module installed alongside ProcessCacheControl to provide helper methods.'),
+            'author' => ProcessCacheControl::AUTHOR,
+            'href' => ProcessCacheControl::REPOSITORY,
+            'version' => ProcessCacheControl::VERSION,
+            'icon' => 'floppy-o',
+            'requires' => [
+                'ProcessCacheControl',
+                'ProcessWire>=3.0.130',
+                'PHP>=7.1',
+            ],
+        ];
+    }
+
     /** @var bool If this is true, all helper methods will not write any log messages */
     protected $silent = false;
-
-    protected $config;
-    protected $cache;
-    protected $files;
-    protected $log;
-
-    public function __construct()
-    {
-        $this->config = $this->wire('config');
-        $this->cache = $this->wire('cache');
-        $this->files = $this->wire('files');
-        $this->log = $this->wire('log');
-    }
 
     /**
      * Turn off all logging done by the helper methods of this module. You can
@@ -64,7 +64,7 @@ class CacheControlTools extends Wire
      */
     public function getAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY): string
     {
-        return $this->cache->getFor(
+        return $this->wire('cache')->getFor(
             self::ASSET_CACHE_NAMESPACE,
             $type,
             function () use ($type) {
@@ -83,7 +83,7 @@ class CacheControlTools extends Wire
     public function refreshAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY, ?string $version = null): string
     {
         $version = $version ?? time();
-        $this->cache->saveFor(
+        $this->wire('cache')->saveFor(
             self::ASSET_CACHE_NAMESPACE,
             $type,
             $version,
@@ -105,7 +105,7 @@ class CacheControlTools extends Wire
      */
     public function clearAllAssetVersions(): self
     {
-        $this->cache->deleteFor(self::ASSET_CACHE_NAMESPACE);
+        $this->wire('cache')->deleteFor(self::ASSET_CACHE_NAMESPACE);
         $this->logMessageIfNotSilent($this->_('Cleared all stored asset versions.'));
         return $this;
     }
@@ -120,8 +120,8 @@ class CacheControlTools extends Wire
      */
     public function clearCacheDirectoryContent(string $directory): self
     {
-        $dirPath = $this->config->paths->cache . $directory;
-        $dirPathFromRoot = $this->config->urls->cache . $directory;
+        $dirPath = $this->wire('config')->paths->cache . $directory;
+        $dirPathFromRoot = $this->wire('config')->urls->cache . $directory;
         // check if the directory exists, and exit early if it doesn't
         if (!is_dir($dirPath)) {
             $this->logMessageIfNotSilent(sprintf(
@@ -132,18 +132,18 @@ class CacheControlTools extends Wire
         }
         // iterate over all contents of the directory and remove them recursively
         $dirIterator = new \DirectoryIterator($dirPath);
-        $cacheLimitPath = $this->config->paths->cache;
+        $cacheLimitPath = $this->wire('config')->paths->cache;
         foreach ($dirIterator as $fileinfo) {
             if ($fileinfo->isDot()) continue;
             if ($fileinfo->isDir()) {
-                $this->files->rmdir(
+                $this->wire('files')->rmdir(
                     $fileinfo->getPathname(),
                     true,
                     ['limitPath' => $cacheLimitPath]
                 );
             }
             if ($fileinfo->isFile() || $fileinfo->isLink()) {
-                $this->files->unlink(
+                $this->wire('files')->unlink(
                     $fileinfo->getPathname(),
                     $cacheLimitPath
                 );
@@ -172,7 +172,7 @@ class CacheControlTools extends Wire
     public function clearWireCacheByNamespaces(array $namespaces): self
     {
         foreach ($namespaces as $namespace) {
-            $this->cache->deleteFor($namespace);
+            $this->wire('cache')->deleteFor($namespace);
         }
         $this->logMessageIfNotSilent(sprintf(
             $this->_('Deleted WireCache entries for the following namespaces: %s'),
@@ -192,7 +192,7 @@ class CacheControlTools extends Wire
      */
     public function logMessage(string $message): self
     {
-        $this->log->save(
+        $this->wire('log')->save(
             self::LOG_NAME,
             $message
         );
