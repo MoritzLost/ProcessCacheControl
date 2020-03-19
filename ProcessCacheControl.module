@@ -44,30 +44,17 @@ class ProcessCacheControl extends Process implements Module
     }
 
     /**
-     * Called by ProcessWire during module installation.
-     *
-     * @return void
-     */
-    public function install()
-    {
-        // save an installation message to force creation of the cache-control log file if it doesnt exist yet
-        $tools = $this->modules->get('CacheControlTools');
-        $tools->logMessage($this->_('ProcessCacheControl installed successfully. Creating the dedicated log file.'));
-        return parent::install();
-    }
-
-    /**
-     * Check if the user can instantiate and use this module. Check this as a
-     * static method BEFORE instantiating the module, because it will throw an
-     * error if the user can't access it.
+     * Get all actions that a user is allowed to execute.
      *
      * @param User|null $user   The user whose access to check. Defaults to the current user.
-     * @return boolean
+     * @return array
      */
-    public static function canUseModule(?User $user = null): bool
+    public function getAllowedActions(?User $user = null): array
     {
         $user = $user ?? wire('user');
-        return $user->hasPermission(self::MODULE_PERMISSION);
+        return array_filter($this->getActionDefinitions(), function (array $action) use ($user) {
+            return $this->canExecuteAction($action['id'], $user);
+        });
     }
 
     /**
@@ -170,6 +157,110 @@ class ProcessCacheControl extends Process implements Module
     }
 
     /**
+     * Check if the user can instantiate and use this module. Check this as a
+     * static method BEFORE instantiating the module, because it will throw an
+     * error if the user can't access it.
+     *
+     * @param User|null $user   The user whose access to check. Defaults to the current user.
+     * @return boolean
+     */
+    public static function canUseModule(?User $user = null): bool
+    {
+        $user = $user ?? wire('user');
+        return $user->hasPermission(self::MODULE_PERMISSION);
+    }
+
+    /**
+     * Check if a user can execute the given action.
+     *
+     * @param string $actionId  The ID of the action to check.
+     * @param User|null $user   The user whose access to check. Defaults to the current user.
+     * @return array
+     */
+    public function canExecuteAction(string $actionId, ?User $user = null): bool
+    {
+        $user = $user ?? wire('user');
+        $actionPermissionName = $this->getActionPermissionName($actionId);
+        $hasModulePermission = $user->hasPermission(self::MODULE_PERMISSION);
+        $actionPermissionExists = $this->permissions->has($actionPermissionName);
+        // the user "lacks" the permissions for this action only if it exists and they don't have it
+        $lacksActionPermission = $actionPermissionExists && !$user->hasPermission($actionPermissionName);
+        return $hasModulePermission && !$lacksActionPermission;
+    }
+
+    /**
+     * Get the name of the optional permission for the passed action ID.
+     *
+     * @param string $actionId  The ID to get the permission name for.
+     * @return string
+     */
+    public function getActionPermissionName(string $actionId): string
+    {
+        return sprintf(
+            self::ACTION_PERMISSION_FORMAT,
+            self::MODULE_PERMISSION,
+            $actionId
+        );
+    }
+
+    /**
+     * Find an action definition by it's ID.
+     *
+     * @param string $action    The ID of the action to find.
+     * @return array|null
+     */
+    public function getActionDefinitionById(string $action): ?array
+    {
+        foreach ($this->getActionDefinitions() as $actionDefinition) {
+            if ($actionDefinition['id'] === $action) {
+                return $actionDefinition;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if the specified action exists.
+     *
+     * @param string $actionId  The ID of the action to check.
+     * @return boolean
+     */ 
+    public function actionExists(string $actionId): bool
+    {
+        return $this->getActionDefinitionById($actionId) !== null;
+    }
+
+    /**
+     * Get the URL of the Process Page in the backend, or a URL that directly
+     * executes an action if an $actionId is provided.
+     *
+     * @param string|null $actionId     Optional ID of the action to get an URL for.
+     * @return string
+     */
+    public function getProcessUrl(?string $actionId = null): string
+    {
+        $ProcessPage = wire('pages')->get(2)->findOne('name=cache-control, include=all');
+        return $ProcessPage->url([
+            'data' => $actionId ? [self::ACTION_PARAMETER_NAME => $actionId] : []
+        ]);
+    }
+
+
+    /**
+     * Called by ProcessWire during module installation.
+     *
+     * @return void
+     */
+    public function install()
+    {
+        // save an installation message to force creation of the cache-control log file if it doesnt exist yet
+        $tools = $this->modules->get('CacheControlTools');
+        $tools->logMessage($this->_('ProcessCacheControl installed successfully. Creating the dedicated log file.'));
+        return parent::install();
+    }
+
+
+    /**
      * The main Process that gets executed on the module's page. Performs the
      * action specified as a GET parameter (if any) and outputs all new log
      * messages. Will also display buttons for all available cache actions.
@@ -259,68 +350,6 @@ class ProcessCacheControl extends Process implements Module
     }
 
     /**
-     * Get the URL of the Process Page in the backend, or a URL that directly
-     * executes an action if an $actionId is provided.
-     *
-     * @param string|null $actionId     Optional ID of the action to get an URL for.
-     * @return string
-     */
-    public function getProcessUrl(?string $actionId = null): string
-    {
-        $ProcessPage = wire('pages')->get(2)->findOne('name=cache-control, include=all');
-        return $ProcessPage->url([
-            'data' => $actionId ? [self::ACTION_PARAMETER_NAME => $actionId] : []
-        ]);
-    }
-
-    /**
-     * Get the name of the optional permission for the passed action ID.
-     *
-     * @param string $actionId  The ID to get the permission name for.
-     * @return string
-     */
-    public function getActionPermissionName(string $actionId): string
-    {
-        return sprintf(
-            self::ACTION_PERMISSION_FORMAT,
-            self::MODULE_PERMISSION,
-            $actionId
-        );
-    }
-
-    /**
-     * Check if a user can execute the given action.
-     *
-     * @param string $actionId  The ID of the action to check.
-     * @param User|null $user   The user whose access to check. Defaults to the current user.
-     * @return array
-     */
-    public function canExecuteAction(string $actionId, ?User $user = null): bool
-    {
-        $user = $user ?? wire('user');
-        $actionPermissionName = $this->getActionPermissionName($actionId);
-        $hasModulePermission = $user->hasPermission(self::MODULE_PERMISSION);
-        $actionPermissionExists = $this->permissions->has($actionPermissionName);
-        // the user "lacks" the permissions for this action only if it exists and they don't have it
-        $lacksActionPermission = $actionPermissionExists && !$user->hasPermission($actionPermissionName);
-        return $hasModulePermission && !$lacksActionPermission;
-    }
-
-    /**
-     * Get all actions that a user is allowed to execute.
-     *
-     * @param User|null $user   The user whose access to check. Defaults to the current user.
-     * @return array
-     */
-    public function getAllowedActions(?User $user = null): array
-    {
-        $user = $user ?? wire('user');
-        return array_filter($this->getActionDefinitions(), function (array $action) use ($user) {
-            return $this->canExecuteAction($action['id'], $user);
-        });
-    }
-
-    /**
      * Parses a list of newline-seperated cache namespaces, filtering out blank lines.
      *
      * @param string $namespaces    The multiline string to parse.
@@ -333,32 +362,5 @@ class ProcessCacheControl extends Process implements Module
                 return !empty($namespace);
             }
         );
-    }
-
-    /**
-     * Find an action definition by it's ID.
-     *
-     * @param string $action    The ID of the action to find.
-     * @return array|null
-     */
-    protected function getActionDefinitionById(string $action): ?array
-    {
-        foreach ($this->getActionDefinitions() as $actionDefinition) {
-            if ($actionDefinition['id'] === $action) {
-                return $actionDefinition;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Check if the specified action exists.
-     *
-     * @param string $actionId  The ID of the action to check.
-     * @return boolean
-     */
-    public function actionExists(string $actionId): bool
-    {
-        return $this->getActionDefinitionById($actionId) !== null;
     }
 }
