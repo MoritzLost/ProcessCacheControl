@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0] - 2020-03-??
+
+- **Feature:** The process page only displays actions the current user can execute, both in the setup menu and on the process page itself.
+- **Feature:** Added a static method `ProcessCacheControl::canUseModule` to check if a user has access to the module. This should be used before instantiating the module to avoid errors.
+- **Feature:** Added new helper methods to check if a user can execute a specific action and get all actions a user can execute.
+- **Feature:** Added a helper method to get the URL of the process page, or the URL that executes a specific action.
+- **Feature:** Added a helper method to check if an action exists.
+- **Feature:** Added a clear success message through the system messages system after an action is executed on the Process page.
+- **Refactor:** If a non-existent action is requested on the process page (through a GET-parameter), the module will display an warning message instead of throwing an error.
+
 ## [0.4.0] - 2020-02-18
 
 - **Refactor / Bugfix:** The `CacheControlTools` class is now a ProcessWire module as well and is installed alongside the main module. This was necessary because the `ProcessCacheControl` module restricts access through the module system, so it couldn't be instantiated during requests from unprivileged users at all.
