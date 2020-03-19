@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.5.0] - 2020-03-??
+## [0.5.0] - 2020-03-19
 
 - **Feature:** The process page only displays actions the current user can execute, both in the setup menu and on the process page itself.
 - **Feature:** Added a static method `ProcessCacheControl::canUseModule` to check if a user has access to the module. This should be used before instantiating the module to avoid errors.

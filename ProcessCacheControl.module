@@ -22,7 +22,7 @@ class ProcessCacheControl extends Process implements Module
             'summary' => __('Adds an entry to the setup menu to clear all caches. Provides an API to add cache management actions and an interface to execute them.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
-            'version' => '0.4.0',
+            'version' => '0.5.0',
             'icon' => 'floppy-o',
             'singular' => true,
             'useNavJSON' => true,
