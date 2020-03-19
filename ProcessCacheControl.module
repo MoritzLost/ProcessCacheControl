@@ -56,6 +56,19 @@ class ProcessCacheControl extends Process implements Module
         return parent::install();
     }
 
+    /**
+     * Check if the user can instantiate and use this module. Check this as a
+     * static method BEFORE instantiating the module, because it will throw an
+     * error if the user can't access it.
+     *
+     * @param User|null $user   The user whose access to check. Defaults to the current user.
+     * @return boolean
+     */
+    public static function canUseModule(?User $user = null): bool
+    {
+        $user = $user ?? wire('user');
+        return $user->hasPermission(self::MODULE_PERMISSION);
+    }
 
     /**
      * Get all available cache actions. This method can be hooked to add
@@ -99,13 +112,11 @@ class ProcessCacheControl extends Process implements Module
         // to execute this action. otherwise, the user only needs the general
         // cache-control permission
         $actionPermissionName = $this->getActionPermissionName($actionId);
-        $hasModulePermission = $this->user->hasPermission(self::MODULE_PERMISSION);
         $actionPermissionExists = $this->permissions->has($actionPermissionName);
-        $hasActionPermission = $actionPermissionExists && $this->user->hasPermission($actionPermissionName);
-        $actionAllowed = $actionPermissionExists ? $hasModulePermission && $hasActionPermission : $hasModulePermission;
+        $actionAllowed = $this->canExecuteAction($actionId, $this->user);
         if (!$actionAllowed) {
             $permissionDeniedMessage = $actionPermissionExists
-                ? $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permissions: %3$s / %4$s')
+                ? $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permissions: %3$s, %4$s')
                 : $this->_('Prevented user %1$s from executing cache control action %2$s because it requires the following permission: %3$s');
             $this->modules->get('CacheControlTools')->logMessage(sprintf(
                 $permissionDeniedMessage,
@@ -174,7 +185,17 @@ class ProcessCacheControl extends Process implements Module
         // if the URL specifies an action, execute it
         $actionId = $this->wire('input')->get(self::ACTION_PARAMETER_NAME);
         if ($actionId) {
-            $this->executeAction($actionId);
+            $actionExists = $this->actionExists($actionId);
+            $userCanExecute = $actionExists && $this->canExecuteAction($actionId, $this->user);
+            $actionDisplayName = $actionExists ? $this->getActionDefinitionById($actionId)['title'] : $actionId;
+            if (!$actionExists) {
+                $this->error(sprintf($this->_("Requested action '%s' does not exist."), $actionDisplayName));
+            } elseif (!$userCanExecute) {
+                $this->error(sprintf($this->_("You lack the permission to execute the action '%s'."), $actionDisplayName));
+            } else {
+                $this->executeAction($actionId);
+                $this->message(sprintf($this->_("Successfully executed action '%s'. Check the log output below for more information."), $actionDisplayName));
+            }
         }
 
         // get all new log messages that were added by the cache clear action
@@ -192,7 +213,7 @@ class ProcessCacheControl extends Process implements Module
         $buttonWrapper->label = $this->_('Available Cache Control Actions');
         $buttonWrapper->columnWidth = 50;
         $buttonWrapper->collapsed = Inputfield::collapsedNever;
-        foreach ($this->getActionDefinitions() as $actionDefinition) {
+        foreach ($this->getAllowedActions() as $actionDefinition) {
             $action = $this->modules->get('InputfieldButton');
             $action->value = $actionDefinition['title'];
             $action->href = $this->page->url(['data' => [
@@ -233,8 +254,23 @@ class ProcessCacheControl extends Process implements Module
         $options['itemLabel'] = 'title';
         $options['add'] = false;
         $options['edit'] = sprintf("?%s={id}", self::ACTION_PARAMETER_NAME);
-        $options['items'] = $this->getActionDefinitions();
+        $options['items'] = $this->getAllowedActions();
         return parent::___executeNavJSON($options);
+    }
+
+    /**
+     * Get the URL of the Process Page in the backend, or a URL that directly
+     * executes an action if an $actionId is provided.
+     *
+     * @param string|null $actionId     Optional ID of the action to get an URL for.
+     * @return string
+     */
+    public function getProcessUrl(?string $actionId = null): string
+    {
+        $ProcessPage = wire('pages')->get(2)->findOne('name=cache-control, include=all');
+        return $ProcessPage->url([
+            'data' => $actionId ? [self::ACTION_PARAMETER_NAME => $actionId] : []
+        ]);
     }
 
     /**
@@ -250,6 +286,38 @@ class ProcessCacheControl extends Process implements Module
             self::MODULE_PERMISSION,
             $actionId
         );
+    }
+
+    /**
+     * Check if a user can execute the given action.
+     *
+     * @param string $actionId  The ID of the action to check.
+     * @param User|null $user   The user whose access to check. Defaults to the current user.
+     * @return array
+     */
+    public function canExecuteAction(string $actionId, ?User $user = null): bool
+    {
+        $user = $user ?? wire('user');
+        $actionPermissionName = $this->getActionPermissionName($actionId);
+        $hasModulePermission = $user->hasPermission(self::MODULE_PERMISSION);
+        $actionPermissionExists = $this->permissions->has($actionPermissionName);
+        // the user "lacks" the permissions for this action only if it exists and they don't have it
+        $lacksActionPermission = $actionPermissionExists && !$user->hasPermission($actionPermissionName);
+        return $hasModulePermission && !$lacksActionPermission;
+    }
+
+    /**
+     * Get all actions that a user is allowed to execute.
+     *
+     * @param User|null $user   The user whose access to check. Defaults to the current user.
+     * @return array
+     */
+    public function getAllowedActions(?User $user = null): array
+    {
+        $user = $user ?? wire('user');
+        return array_filter($this->getActionDefinitions(), function (array $action) use ($user) {
+            return $this->canExecuteAction($action['id'], $user);
+        });
     }
 
     /**
@@ -281,5 +349,16 @@ class ProcessCacheControl extends Process implements Module
             }
         }
         return null;
+    }
+
+    /**
+     * Check if the specified action exists.
+     *
+     * @param string $actionId  The ID of the action to check.
+     * @return boolean
+     */
+    public function actionExists(string $actionId): bool
+    {
+        return $this->getActionDefinitionById($actionId) !== null;
     }
 }
