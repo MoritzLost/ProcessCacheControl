@@ -1,4 +1,5 @@
 <?php
+
 namespace Processwire;
 
 use ProcessWire\Inputfield;
@@ -16,6 +17,7 @@ class ProcessCacheControlConfig extends ModuleConfig
                 'Page'
             ],
             'ClearAllAssetVersions' => true,
+            'ClearProCache' => true,
         ];
     }
 
@@ -59,11 +61,25 @@ class ProcessCacheControlConfig extends ModuleConfig
             $this->config->urls->cache
         );
         $ClearCacheDirectories->notes = $this->_("If a 'Page' entry exists it should always be selected, as it contains the template render cache.\n If a folder in your cache directory does not appear in this list, it may not be writable by the server.");
-        $ClearCacheDirectories->columnWidth = 50;
+        $ClearCacheDirectories->columnWidth = 34;
+        $ClearCacheDirectories->collapsed = Inputfield::collapsedNever;
         $cacheDirectories = $this->getCacheDirectories();
         foreach ($cacheDirectories as $cacheDir) {
             $ClearCacheDirectories->addOption($cacheDir, $cacheDir);
         }
+
+        // clear ProCache
+        $ClearProCache = wire()->modules->get('InputfieldCheckbox');
+        $ClearProCache->name = 'ClearProCache';
+        $ClearProCache->label = $this->_('ProCache');
+        $ClearProCache->label2 = $this->_('Clear the entire cache of the commercial ProCache module.');
+        $siteHasProcache = $this->wire('procache') !== null;
+        $ClearProCache->description = $siteHasProcache
+            ? $this->_('Your site appears to be running ProCache.')
+            : $this->_("Your site doesn't appear to be running ProCache, so this option will have no effect.");
+        $ClearProCache->notes = $this->_('This uses [$procache->clearAll](https://processwire.com/store/pro-cache/#procache-api).');
+        $ClearProCache->columnWidth = 33;
+        $ClearProCache->collapsed = Inputfield::collapsedNever;
 
         // clear asset versions
         $ClearAllAssetVersions = wire()->modules->get('InputfieldCheckbox');
@@ -71,7 +87,7 @@ class ProcessCacheControlConfig extends ModuleConfig
         $ClearAllAssetVersions->label = $this->_('Asset versions');
         $ClearAllAssetVersions->label2 = $this->_('Refresh all stored asset versions.');
         $ClearAllAssetVersions->notes = $this->_('This requires some setup in your templates. See the [documentation](https://github.com/MoritzLost/ProcessCacheControl) for details.');
-        $ClearAllAssetVersions->columnWidth = 50;
+        $ClearAllAssetVersions->columnWidth = 33;
         $ClearAllAssetVersions->collapsed = Inputfield::collapsedNever;
 
         // wrap inside a fieldset for the default action
@@ -83,6 +99,7 @@ class ProcessCacheControlConfig extends ModuleConfig
         $defaultActionFieldset->add($WireCacheDeleteAll);
         $defaultActionFieldset->add($WireCacheDeleteNamespaces);
         $defaultActionFieldset->add($ClearCacheDirectories);
+        $defaultActionFieldset->add($ClearProCache);
         $defaultActionFieldset->add($ClearAllAssetVersions);
 
         $inputfields->add($defaultActionFieldset);

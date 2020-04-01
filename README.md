@@ -9,7 +9,7 @@ This is a module for the [ProcessWire CMF](https://processwire.com/) that adds a
 - [Basic usage and configuration](#features)
 - [HTTP cache busting for assets](#http-cache-busting-for-assets)
 - [Defining additional cache actions](#defining-additional-cache-actions)
-- [Triggering cache actions through the API](#triggering-cache-actions-through-the-api)
+- [Listing and executing cache actions through the API](#listing-and-executing-cache-actions-through-the-api)
 - [Modifying the default cache action](#modifying-the-default-cache-action)
 - [Permission system](#permission-system)
 
@@ -19,6 +19,7 @@ The fastest ProcessWire sites use multiple caching mechanisms to speed up page d
 
 - The template render cache provided by ProcessWire.
 - The database cache (`$cache` / `WireCache`) that you can use in your templates to store the results of long-running queries or other computations.
+- The commercial [ProCache module](https://processwire.com/store/pro-cache/).
 - HTTP `Cache-Control` headers that tell browsers to cache static assets like JavaScript and CSS files for some time.
 - Other site-specific caching mechanisms, like [Twig's compilation cache](https://twig.symfony.com/doc/3.x/api.html#compilation-cache) if you're using Twig.
 
@@ -43,6 +44,7 @@ By default, only one _Clear all_ cache action is available. You can change the b
 
 - Clear the template render cache, if it exists.
 - Clear the database cache through the `$cache` API by expiring and/or deleting all entries (except for reserved system entries).
+- Clear the ProCache module cache, if it is installed.
 - Clear all stored asset versions (this requires some setup, see [HTTP cache busting for assets](#http-cache-busting-for-assets)).
 
 The module configuration provides some options to change that behaviour. In particular, you can select folders in your site's cache directory to be cleared out as well. This allows you to clear site-specific cache folders as well, such as the Twig compilation cache or the ProCache static cache.
@@ -150,17 +152,47 @@ wire()->addHookAfter('ProcessCacheControl::getActionDefinitions', function (Hook
 - For reference, check out the [action defintion of the default _Clear all_ action](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L72-L79) and the [corresponding callback](https://github.com/MoritzLost/ProcessCacheControl/blob/master/ProcessCacheControl.module#L122-L159).
 - If you want to remove the default action, simply replace the return value in your hook with an array of your custom actions instead of adding to it.
 
-## Triggering cache actions through the API
+## Listing and executing cache actions through the API
 
-You can manually execute cache actions through the API by using the ID you defined in the previous step. This way, the module will check if the current user has the permission to execute this action before executing it (see [permission system](#permission-system)). Note that the module can only be instantiated if the current user has the `cache-control` permission.
+You may want to include links to the Process page or specific actions somewhere else on your site (for example, in a list of context links for logged-in editors). In this case, you'll always want to check if the current user can use the module before doing anything with it. If they don't have the required permission, trying to instantiate the module will throw an error. Because of this, you can check if the user has access using a static method:
+
+```php
+$canUseProcessCacheControl = \ProcessWire\ProcessCacheControl::canUseModule();
+```
+
+If this returns true, you can safely instantiate the module.
+
+After that, you can use the instance to list all actions the current user can execute and output links that directly execute a specific action:
 
 ```php
 $ProcessCacheControl = wire('modules')->get('ProcessCacheControl');
 
-// execute a custom cache action
-$ProcessCacheControl->executeAction('my-custom-action');
+// get all actions the current user can execute
+$userExecutableActions = $ProcessCacheControl->getAllowedActions();
 
-// execute the default 'Clear all' cache action
+// output links to those actions
+foreach ($userExecutableActions as $actionDefinition) {
+    echo '<a href="' . $ProcessCacheControl->getProcessUrl($actionDefinition['id']) . '">' . $actionDefinition['title'] . '</a>';
+}
+```
+
+You can also manually execute cache actions through the API by using their ID. Before you do that, you can check if an action with the ID exists, and if the current user can execute it.
+
+```php
+$ProcessCacheControl = wire('modules')->get('ProcessCacheControl');
+
+$actionId = 'my-custom-action';
+
+// check if the action exists
+$actionExists = $ProcessCacheControl->actionExists($actionId);
+
+// check if the current user can execute it
+$canExecuteAction = $ProcessCacheControl->canExecuteAction($actionId);
+
+// execute a custom cache action
+$ProcessCacheControl->executeAction($actionId);
+
+// you can also execute the default 'Clear all' cache action this way
 $ProcessCacheControl->executeAction(\ProcessWire\ProcessCacheControl::DEFAULT_ACTION_ID);
 ```
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace ProcessWire;
 
 class CacheControlTools extends Wire implements Module
@@ -19,7 +20,7 @@ class CacheControlTools extends Wire implements Module
             'summary' => __('Utility module installed alongside ProcessCacheControl to provide helper methods.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
-            'version' => '0.4.0',
+            'version' => '1.0.0',
             'icon' => 'floppy-o',
             'requires' => [
                 'ProcessCacheControl',

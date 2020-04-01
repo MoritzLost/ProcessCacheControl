@@ -1,4 +1,5 @@
 <?php
+
 namespace ProcessWire;
 
 class ProcessCacheControl extends Process implements Module
@@ -22,7 +23,7 @@ class ProcessCacheControl extends Process implements Module
             'summary' => __('Adds an entry to the setup menu to clear all caches. Provides an API to add cache management actions and an interface to execute them.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
-            'version' => '0.5.0',
+            'version' => '1.0.0',
             'icon' => 'floppy-o',
             'singular' => true,
             'useNavJSON' => true,
@@ -41,6 +42,20 @@ class ProcessCacheControl extends Process implements Module
                 'title' => __('Cache Control'),
             ],
         ];
+    }
+
+    /**
+     * Check if the user can instantiate and use this module. Check this as a
+     * static method BEFORE instantiating the module, because it will throw an
+     * error if the user can't access it.
+     *
+     * @param User|null $user   The user whose access to check. Defaults to the current user.
+     * @return boolean
+     */
+    public static function canUseModule(?User $user = null): bool
+    {
+        $user = $user ?? wire('user');
+        return $user->hasPermission(self::MODULE_PERMISSION);
     }
 
     /**
@@ -150,24 +165,19 @@ class ProcessCacheControl extends Process implements Module
             }
         }
 
+        // clear procache through the api, if it is installed
+        if ($this->ClearProCache) {
+            $procache = $this->wire('procache');
+            if (null !== $procache) {
+                $procache->clearAll();
+                $tools->logMessage($this->_('Cleared the ProCache module cache ($procache->clearAll()).'));
+            }
+        }
+
         // clear all stored asset versions
         if ($this->ClearAllAssetVersions) {
             $tools->clearAllAssetVersions();
         }
-    }
-
-    /**
-     * Check if the user can instantiate and use this module. Check this as a
-     * static method BEFORE instantiating the module, because it will throw an
-     * error if the user can't access it.
-     *
-     * @param User|null $user   The user whose access to check. Defaults to the current user.
-     * @return boolean
-     */
-    public static function canUseModule(?User $user = null): bool
-    {
-        $user = $user ?? wire('user');
-        return $user->hasPermission(self::MODULE_PERMISSION);
     }
 
     /**
@@ -355,7 +365,8 @@ class ProcessCacheControl extends Process implements Module
      * @param string $namespaces    The multiline string to parse.
      * @return array
      */
-    protected function parseNamespaceList(string $namespaces): array {
+    protected function parseNamespaceList(string $namespaces): array
+    {
         return array_filter(
             preg_split("/[\r\n]+/", $namespaces),
             function ($namespace) {

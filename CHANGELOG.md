@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.0] - 2020-04-01
+
+- **Milestone:** First stable release!
+- **Feature:** Added experimental ProCache integration. The module now has an additional option to clear the ProCache during the default action. This uses $procache->clearAll().
+- **Docs:** Added documentation and usage examples for the new methods added in the previous release.
+
 ## [0.5.0] - 2020-03-19
 
 - **Feature:** The process page only displays actions the current user can execute, both in the setup menu and on the process page itself.
