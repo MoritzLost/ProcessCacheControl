@@ -92,8 +92,8 @@ class ProcessCacheControlConfig extends ModuleConfig
 
         // wrap inside a fieldset for the default action
         $defaultActionFieldset = wire()->modules->get('InputfieldFieldset');
-        $defaultActionFieldset->label = $this->_('Default "Clear All" action');
-        $defaultActionFieldset->description = $this->_('Those options control what happens when you the default "Clear all" action is executed. Consult the documentation to find out how to add custom actions to the module.');
+        $defaultActionFieldset->label = $this->_('Default "Clear all" action');
+        $defaultActionFieldset->description = $this->_('These options control what happens when the default "Clear all" action is executed. Consult the documentation to find out how to add custom actions to the module.');
         $defaultActionFieldset->collapsed = Inputfield::collapsedNo;
         $defaultActionFieldset->add($WireCacheExpireAll);
         $defaultActionFieldset->add($WireCacheDeleteAll);
