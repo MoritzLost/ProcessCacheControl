@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2021-03-05
+
+- **Feature:** Asset versions are now saved with WireCache::expireNever instead of WireCache::expireReserved, allowing it to be deleted using $cache->deleteAll() calls.
+- **Bugfix:** Fix saved asset versions expiring after one day when generated implicitly using CacheControlTools::getAssetVersion. Asset versions will now be correctly saved without an expiration time.
+- **Docs:** Fix grammar mistake in the module configuration. fixes issue #2
+
 ## [1.0.0] - 2020-04-01
 
 - **Milestone:** First stable release!

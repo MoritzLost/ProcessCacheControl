@@ -20,7 +20,7 @@ class CacheControlTools extends Wire implements Module
             'summary' => __('Utility module installed alongside ProcessCacheControl to provide helper methods.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
-            'version' => '1.0.0',
+            'version' => '1.1.0',
             'icon' => 'floppy-o',
             'requires' => [
                 'ProcessCacheControl',
@@ -65,13 +65,11 @@ class CacheControlTools extends Wire implements Module
      */
     public function getAssetVersion(string $type = self::ASSET_CACHE_DEFAULT_KEY): string
     {
-        return $this->wire('cache')->getFor(
+        $assetVersion = $this->wire('cache')->getFor(
             self::ASSET_CACHE_NAMESPACE,
-            $type,
-            function () use ($type) {
-                return $this->refreshAssetVersion($type);
-            }
+            $type
         );
+        return $assetVersion ?: $this->refreshAssetVersion($type);
     }
 
     /**
@@ -88,7 +86,7 @@ class CacheControlTools extends Wire implements Module
             self::ASSET_CACHE_NAMESPACE,
             $type,
             $version,
-            WireCache::expireReserved
+            WireCache::expireNever
         );
         $this->logMessageIfNotSilent(sprintf(
             $this->_('Updated the asset version for type %1$s to: %2$s'),
