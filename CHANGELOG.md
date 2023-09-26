@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1] - 2023-09-26
+
+- **Bugfix:** Fix a potential installation issue. @see https://github.com/processwire/processwire-issues/issues/1462
+
 ## [1.1.0] - 2021-03-05
 
 - **Feature:** Asset versions are now saved with WireCache::expireNever instead of WireCache::expireReserved, allowing it to be deleted using $cache->deleteAll() calls.

@@ -23,7 +23,7 @@ class ProcessCacheControl extends Process implements Module
             'summary' => __('Adds an entry to the setup menu to clear all caches. Provides an API to add cache management actions and an interface to execute them.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/ProcessCacheControl',
-            'version' => '1.1.0',
+            'version' => '1.1.1',
             'icon' => 'floppy-o',
             'singular' => true,
             'useNavJSON' => true,
@@ -261,12 +261,12 @@ class ProcessCacheControl extends Process implements Module
      *
      * @return void
      */
-    public function install()
+    public function ___install()
     {
         // save an installation message to force creation of the cache-control log file if it doesnt exist yet
         $tools = $this->modules->get('CacheControlTools');
         $tools->logMessage($this->_('ProcessCacheControl installed successfully. Creating the dedicated log file.'));
-        return parent::install();
+        return parent::___install();
     }
 
 
